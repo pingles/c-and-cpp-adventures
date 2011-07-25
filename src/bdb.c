@@ -6,7 +6,7 @@
 /* Compile: gcc src/bdb.c -o bdb -Wall -ldb */
 
 int
-store_data(DB *db, char* description, float money)
+store_data(DB *db, char *description, float money)
 {
   int ret;
   DBT key, data;
@@ -17,7 +17,7 @@ store_data(DB *db, char* description, float money)
   key.data = &money;
   key.size = sizeof(float);
 
-  data.data = &description;
+  data.data = description;
   data.size = strlen(description) + 1;
 
   ret = db->put(db, NULL, &key, &data, DB_NOOVERWRITE);
@@ -29,8 +29,38 @@ store_data(DB *db, char* description, float money)
 }
 
 int
-main(void)
+read_data(DB *db, float *key, char *description)
 {
+  int ret;
+  DBT k, d;
+
+  memset(&k, 0, sizeof(DBT));
+  memset(&d, 0, sizeof(DBT));
+
+  k.data = key;
+  k.size = sizeof(float);
+  
+  d.data = description;
+  d.ulen = 200;
+  d.flags = DB_DBT_USERMEM;
+
+  ret = db->get(db, NULL, &k, &d, 0);
+  if (ret != 0) {
+    db->err(db, ret, "Get failed.", NULL);
+  }
+
+  return ret;
+}
+
+int
+main(int argc, char *argv[])
+{
+  if (argc < 1) {
+    printf("Specify DB name\n");
+    return -1;
+  }
+
+  
   DB *dbp;
   int ret;
 
@@ -42,15 +72,25 @@ main(void)
 
   int file_mode = 0;
 
-  ret = dbp->open(dbp, NULL, "./my_db.db", NULL, DB_BTREE, DB_CREATE, file_mode);
+  printf("Opening DB: %s\n", argv[1]);
+
+  ret = dbp->open(dbp, NULL, argv[1], NULL, DB_BTREE, DB_CREATE, file_mode);
   if (ret != 0) {
     printf("Error opening DB\n");
   }
 
-  float money = 122.56;
-  char *description = "Grocery Bill";
+  float result_key = 122.56;
+  char result_desc[200];
 
-  store_data(dbp, description, money);
+  ret = read_data(dbp, &result_key, result_desc);
+  if (ret == 0) {
+    printf("--------- reading ---------------\n");
+    printf("Key : %f\n", result_key);
+    printf("Data: %s\n", result_desc);
+    printf("--------- reading ---------------\n");
+  }
+
+  store_data(dbp, "Grocery Bill", 122.56);
 
   ret = dbp->close(dbp, 0);
   if (ret != 0) {
